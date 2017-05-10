@@ -68,6 +68,8 @@ import org.docx4j.openpackaging.parts.relationships.Namespaces;
 import org.docx4j.openpackaging.parts.relationships.RelationshipsPart;
 import org.docx4j.org.xhtmlrenderer.css.constants.CSSName;
 import org.docx4j.org.xhtmlrenderer.css.constants.IdentValue;
+import org.docx4j.org.xhtmlrenderer.css.parser.FSFunction;
+import org.docx4j.org.xhtmlrenderer.css.parser.PropertyValue;
 import org.docx4j.org.xhtmlrenderer.css.style.CalculatedStyle;
 import org.docx4j.org.xhtmlrenderer.css.style.DerivedValue;
 import org.docx4j.org.xhtmlrenderer.css.style.FSDerivedValue;
@@ -80,25 +82,10 @@ import org.docx4j.org.xhtmlrenderer.render.BlockBox;
 import org.docx4j.org.xhtmlrenderer.render.Box;
 import org.docx4j.org.xhtmlrenderer.render.InlineBox;
 import org.docx4j.org.xhtmlrenderer.resource.XMLResource;
-import org.docx4j.wml.Body;
-import org.docx4j.wml.CTMarkupRange;
-import org.docx4j.wml.CTSimpleField;
-import org.docx4j.wml.ContentAccessor;
+import org.docx4j.wml.*;
 import org.docx4j.wml.DocDefaults.RPrDefault;
-import org.docx4j.wml.HpsMeasure;
-import org.docx4j.wml.P;
 import org.docx4j.wml.P.Hyperlink;
-import org.docx4j.wml.PPr;
 import org.docx4j.wml.PPrBase.PStyle;
-import org.docx4j.wml.R;
-import org.docx4j.wml.RFonts;
-import org.docx4j.wml.RPr;
-import org.docx4j.wml.RStyle;
-import org.docx4j.wml.Style;
-import org.docx4j.wml.Tbl;
-import org.docx4j.wml.Tc;
-import org.docx4j.wml.Text;
-import org.docx4j.wml.Tr;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
@@ -817,7 +804,7 @@ public class XHTMLImporterImpl implements XHTMLImporter {
     
     
     private void traverse(Box box,  Box parent, TableProperties tableProperties) throws Docx4JException {
-        
+        //ha running, akkor vegyük ki és tegyük a megfelelő helyre
     	boolean mustPop = false;
     	
         log.debug(box.getClass().getName() );
@@ -1838,8 +1825,36 @@ public class XHTMLImporterImpl implements XHTMLImporter {
         //log.debug("'" + ((InlineBox)o).getTextNode().getTextContent() );  // don't use .getText()
         
         processInlineBoxContent(inlineBox, s, cssMap);
-        
+
     }
+
+	private R wrapR(JAXBElement<CTSimpleField> fldSimple){
+		R run2 = Context.getWmlObjectFactory().createR();
+		run2.getContent().add(fldSimple);
+
+		return run2;
+	}
+
+	private JAXBElement<CTSimpleField> pageNum(String value) {
+		ObjectFactory factory = Context.getWmlObjectFactory();
+
+		CTSimpleField ctSimple = factory.createCTSimpleField();
+		ctSimple.setInstr(" PAGE \\* MERGEFORMAT ");
+
+		RPr RPr = factory.createRPr();
+		RPr.setNoProof(new BooleanDefaultTrue());
+
+		Text t = factory.createText();
+		t.setValue(value);
+
+		R run = factory.createR();
+		run.getContent().add(RPr);
+		run.getContent().add(t);
+
+		ctSimple.getContent().add(run);
+
+		return factory.createPFldSimple(ctSimple);
+	}
 
 	private void processInlineBoxContent(InlineBox inlineBox, Styleable s,
 			Map<String, CSSValue> cssMap) {
@@ -1864,7 +1879,31 @@ public class XHTMLImporterImpl implements XHTMLImporter {
                 getListForRun().getContent().add(run);                
            		run.getContent().add(Context.getWmlObjectFactory().createBr());
             	
-            } else {
+            } else if("after".equals(inlineBox.getPseudoElementOrClass())){
+				String cssClass = getClassAttribute(s.getElement());
+				if (cssClass != null) {
+					cssClass = cssClass.trim();
+				}
+				if(inlineBox.getFunction() != null){
+					FSFunction function = inlineBox.getFunction();
+					if("counter".equals(function.getName())){
+						if("page".equals(((PropertyValue)function.getParameters().get(0)).getCssText())){
+							R pgNum = wrapR(pageNum(inlineBox.getText()));
+
+							getListForRun().getContent().add(pgNum);
+
+							// Run level styling
+							RPr rPr =  Context.getWmlObjectFactory().createRPr();
+							pgNum.setRPr(rPr);
+							formatRPr(rPr, cssClass, cssMap);
+						}
+					}
+				}
+				else {
+					addRun(cssClass, cssMap, inlineBox.getText());
+				}
+			}
+			else{
             	log.debug("InlineBox has no TextNode, so skipping" );
             	
             	// TODO .. a span in a span or a?
@@ -1897,7 +1936,7 @@ public class XHTMLImporterImpl implements XHTMLImporter {
     		bookmarkHelper.attachBookmarkEnd(markupRangeForID, getCurrentParagraph(false), this.contentContextStack.peek());
     	}            				
 	}
-	
+
 	private String getClassAttribute(Element e) {
 		
 		if (e==null) {
