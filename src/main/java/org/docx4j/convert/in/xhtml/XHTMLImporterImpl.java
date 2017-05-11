@@ -71,19 +71,23 @@ import org.docx4j.openpackaging.parts.relationships.Namespaces;
 import org.docx4j.openpackaging.parts.relationships.RelationshipsPart;
 import org.docx4j.org.xhtmlrenderer.css.constants.CSSName;
 import org.docx4j.org.xhtmlrenderer.css.constants.IdentValue;
+import org.docx4j.org.xhtmlrenderer.css.constants.MarginBoxName;
+import org.docx4j.org.xhtmlrenderer.css.constants.PageElementPosition;
+import org.docx4j.org.xhtmlrenderer.css.parser.FSFunction;
+import org.docx4j.org.xhtmlrenderer.css.parser.PropertyValue;
+import org.docx4j.org.xhtmlrenderer.css.sheet.PropertyDeclaration;
 import org.docx4j.org.xhtmlrenderer.css.style.CalculatedStyle;
 import org.docx4j.org.xhtmlrenderer.css.style.DerivedValue;
 import org.docx4j.org.xhtmlrenderer.css.style.FSDerivedValue;
 import org.docx4j.org.xhtmlrenderer.css.style.derived.LengthValue;
 import org.docx4j.org.xhtmlrenderer.docx.DocxRenderer;
+import org.docx4j.org.xhtmlrenderer.layout.Layer;
 import org.docx4j.org.xhtmlrenderer.layout.Styleable;
 import org.docx4j.org.xhtmlrenderer.newtable.TableBox;
 import org.docx4j.org.xhtmlrenderer.render.*;
 import org.docx4j.org.xhtmlrenderer.resource.XMLResource;
-import org.docx4j.wml.Body;
-import org.docx4j.wml.CTMarkupRange;
-import org.docx4j.wml.CTSimpleField;
-import org.docx4j.wml.ContentAccessor;
+import org.docx4j.relationships.Relationship;
+import org.docx4j.wml.*;
 import org.docx4j.wml.DocDefaults.RPrDefault;
 import org.docx4j.wml.P.Hyperlink;
 import org.docx4j.wml.PPrBase.PStyle;
@@ -95,6 +99,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.css.CSSValue;
 import org.xml.sax.InputSource;
 
+import static org.docx4j.org.xhtmlrenderer.css.parser.PropertyValue.VALUE_TYPE_FUNCTION;
 import static org.docx4j.wml.STPTabLeader.NONE;
 
 /**
@@ -225,7 +230,7 @@ public class XHTMLImporterImpl implements XHTMLImporter {
 	
 	
 	
-	private Body imports = null; 
+	private Body imports = null;
     
     
     
@@ -796,156 +801,12 @@ public class XHTMLImporterImpl implements XHTMLImporter {
     	return getCurrentParagraph(true);
     }
     
-
-
-    
     private void traverse(Box box, TableProperties tableProperties) throws Docx4JException {
     	setDefaultFontSize();
-
-		ObjectFactory factory = Context.getWmlObjectFactory();
-		BlockBox rootBox = renderer.getRootBox();
-
-		List pages = rootBox.getLayer().getPages();
-
-		if(!pages.isEmpty()) {
-			addHeader(pages);
-			addFooter(pages);
-		}
 
 		traverse( box, null,  tableProperties);
     	unsetDefaultFontSize();
     }
-
-	private void addFooter(List pages) throws InvalidFormatException {
-		R leftFooter = wrap(getMarginBoxContent((PageBox) pages.get(0), MarginBoxName.BOTTOM_LEFT));
-		R centerFooter = wrap(getMarginBoxContent((PageBox) pages.get(0), MarginBoxName.BOTTOM_CENTER));
-		R rightFooter = wrap(getMarginBoxContent((PageBox) pages.get(0), MarginBoxName.BOTTOM_RIGHT));
-
-		ObjectFactory factory = Context.getWmlObjectFactory();
-
-		R centerTabR = factory.createR();
-		R.Ptab centerTab = factory.createRPtab();
-		centerTab.setLeader(NONE);
-		centerTab.setAlignment(STPTabAlignment.CENTER);
-		centerTab.setRelativeTo(STPTabRelativeTo.MARGIN);
-		centerTabR.getContent().add(centerTab);
-
-		R.Ptab rightTab = factory.createRPtab();
-		rightTab.setLeader(NONE);
-		rightTab.setAlignment(STPTabAlignment.RIGHT);
-		rightTab.setRelativeTo(STPTabRelativeTo.MARGIN);
-
-		P paragraph = factory.createP();
-		paragraph.getContent().add(leftFooter);
-		paragraph.getContent().add(centerTabR);
-		paragraph.getContent().add(centerFooter);
-		paragraph.getContent().add(rightTab);
-		paragraph.getContent().add(rightFooter);
-
-		Ftr footer = factory.createFtr();
-		footer.getContent().add(paragraph);
-
-		FooterPart footerPart = new FooterPart();
-		footerPart.setPackage(wordMLPackage);
-		footerPart.setJaxbElement(footer);
-
-		Relationship relationship = wordMLPackage.getMainDocumentPart()
-				.addTargetPart(footerPart);
-		List<SectionWrapper> sections = wordMLPackage.getDocumentModel()
-				.getSections();
-		SectPr sectionProperties = sections.get(sections.size() - 1)
-				.getSectPr();
-		// There is always a section wrapper, but it might not contain a sectPr
-		if (sectionProperties == null) {
-			sectionProperties = factory.createSectPr();
-			wordMLPackage.getMainDocumentPart().addObject(sectionProperties);
-			sections.get(sections.size() - 1).setSectPr(sectionProperties);
-		}
-
-		FooterReference footerReference = factory.createFooterReference();
-		footerReference.setId(relationship.getId());
-		footerReference.setType(HdrFtrRef.DEFAULT);
-		sectionProperties.getEGHdrFtrReferences().add(footerReference);
-	}
-
-	private void addHeader(List pages) throws InvalidFormatException {
-		R leftHeader = wrap(getMarginBoxContent((PageBox) pages.get(0), MarginBoxName.TOP_LEFT));
-		R centerHeader = wrap(getMarginBoxContent((PageBox) pages.get(0), MarginBoxName.TOP_CENTER));
-		R rightHeader = wrap(getMarginBoxContent((PageBox) pages.get(0), MarginBoxName.TOP_RIGHT));
-		ObjectFactory factory = Context.getWmlObjectFactory();
-
-		R centerTabR = factory.createR();
-		R.Ptab centerTab = factory.createRPtab();
-		centerTab.setLeader(NONE);
-		centerTab.setAlignment(STPTabAlignment.CENTER);
-		centerTab.setRelativeTo(STPTabRelativeTo.MARGIN);
-		centerTabR.getContent().add(centerTab);
-
-		R.Ptab rightTab = factory.createRPtab();
-		rightTab.setLeader(NONE);
-		rightTab.setAlignment(STPTabAlignment.RIGHT);
-		rightTab.setRelativeTo(STPTabRelativeTo.MARGIN);
-
-		P paragraph = factory.createP();
-		paragraph.getContent().add(leftHeader);
-		paragraph.getContent().add(centerTabR);
-		paragraph.getContent().add(centerHeader);
-		paragraph.getContent().add(rightTab);
-		paragraph.getContent().add(rightHeader);
-
-		Hdr header = factory.createHdr();
-		header.getContent().add(paragraph);
-
-		HeaderPart headerPart = new HeaderPart();
-		headerPart.setPackage(wordMLPackage);
-		headerPart.setJaxbElement(header);
-
-		Relationship relationship = wordMLPackage.getMainDocumentPart()
-				.addTargetPart(headerPart);
-		List<SectionWrapper> sections = wordMLPackage.getDocumentModel()
-				.getSections();
-		SectPr sectionProperties = sections.get(sections.size() - 1)
-				.getSectPr();
-		// There is always a section wrapper, but it might not contain a sectPr
-		if (sectionProperties == null) {
-			sectionProperties = factory.createSectPr();
-			wordMLPackage.getMainDocumentPart().addObject(sectionProperties);
-			sections.get(sections.size() - 1).setSectPr(sectionProperties);
-		}
-
-		HeaderReference headerReference = factory.createHeaderReference();
-		headerReference.setId(relationship.getId());
-		headerReference.setType(HdrFtrRef.DEFAULT);
-		sectionProperties.getEGHdrFtrReferences().add(headerReference);
-	}
-
-	private R wrap(Text text) {
-		ObjectFactory factory = Context.getWmlObjectFactory();
-
-		R wrapper = factory.createR();
-		wrapper.getContent().add(text);
-
-		return wrapper;
-	}
-
-	private Text getMarginBoxContent(PageBox page, MarginBoxName marginBoxName) {
-		String value = "";
-		Map marginBoxes = page.getPageInfo().getMarginBoxes();
-		if(marginBoxes.containsKey(marginBoxName)) {
-			List<PropertyDeclaration> topLeft = (List<PropertyDeclaration>) marginBoxes.get(marginBoxName);
-			for(PropertyDeclaration declaration: topLeft) {
-				if (CSSName.CONTENT.equals(declaration.getCSSName())) {
-					PropertyValue value1 = (PropertyValue) declaration.getValue();
-					value = value1.getCssText();
-				}
-			}
-		}
-
-		Text text = new Text();
-		text.setValue(value);
-
-		return text;
-	}
 
 	private void traverse(Box box,  Box parent, TableProperties tableProperties) throws Docx4JException {
         
@@ -1972,34 +1833,6 @@ public class XHTMLImporterImpl implements XHTMLImporter {
 
     }
 
-	private R wrapR(JAXBElement<CTSimpleField> fldSimple){
-		R run2 = Context.getWmlObjectFactory().createR();
-		run2.getContent().add(fldSimple);
-
-		return run2;
-	}
-
-	private JAXBElement<CTSimpleField> pageNum(String value) {
-		ObjectFactory factory = Context.getWmlObjectFactory();
-
-		CTSimpleField ctSimple = factory.createCTSimpleField();
-		ctSimple.setInstr(" PAGE \\* MERGEFORMAT ");
-
-		RPr RPr = factory.createRPr();
-		RPr.setNoProof(new BooleanDefaultTrue());
-
-		Text t = factory.createText();
-		t.setValue(value);
-
-		R run = factory.createR();
-		run.getContent().add(RPr);
-		run.getContent().add(t);
-
-		ctSimple.getContent().add(run);
-
-		return factory.createPFldSimple(ctSimple);
-	}
-
 	private void processInlineBoxContent(InlineBox inlineBox, Styleable s,
 			Map<String, CSSValue> cssMap) {
 				
@@ -2022,30 +1855,6 @@ public class XHTMLImporterImpl implements XHTMLImporter {
                 R run = Context.getWmlObjectFactory().createR();
                 getListForRun().getContent().add(run);                
            		run.getContent().add(Context.getWmlObjectFactory().createBr());
-            	
-            } else if("after".equals(inlineBox.getPseudoElementOrClass())){
-				String cssClass = getClassAttribute(s.getElement());
-				if (cssClass != null) {
-					cssClass = cssClass.trim();
-				}
-				if(inlineBox.getFunction() != null){
-					FSFunction function = inlineBox.getFunction();
-					if("counter".equals(function.getName())){
-						if("page".equals(((PropertyValue)function.getParameters().get(0)).getCssText())){
-							R pgNum = wrapR(pageNum(inlineBox.getText()));
-
-							getListForRun().getContent().add(pgNum);
-
-							// Run level styling
-							RPr rPr =  Context.getWmlObjectFactory().createRPr();
-							pgNum.setRPr(rPr);
-							formatRPr(rPr, cssClass, cssMap);
-						}
-					}
-				}
-				else {
-					addRun(cssClass, cssMap, inlineBox.getText());
-				}
 			}
 			else{
             	log.debug("InlineBox has no TextNode, so skipping" );
@@ -2473,7 +2282,7 @@ public class XHTMLImporterImpl implements XHTMLImporter {
     	return HR_P;
     }
 
-	
+
 	public final static class TableProperties {
 		
 		private TableBox tableBox;
