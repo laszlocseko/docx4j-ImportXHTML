@@ -68,7 +68,6 @@ import org.docx4j.openpackaging.parts.relationships.Namespaces;
 import org.docx4j.openpackaging.parts.relationships.RelationshipsPart;
 import org.docx4j.org.xhtmlrenderer.css.constants.CSSName;
 import org.docx4j.org.xhtmlrenderer.css.constants.IdentValue;
-import org.docx4j.org.xhtmlrenderer.css.parser.FSFunction;
 import org.docx4j.org.xhtmlrenderer.css.parser.PropertyValue;
 import org.docx4j.org.xhtmlrenderer.css.style.CalculatedStyle;
 import org.docx4j.org.xhtmlrenderer.css.style.DerivedValue;
@@ -1879,20 +1878,26 @@ public class XHTMLImporterImpl implements XHTMLImporter {
 				if (cssClass != null) {
 					cssClass = cssClass.trim();
 				}
-				if(inlineBox.getFunction() != null){
-					FSFunction function = inlineBox.getFunction();
-					if("counter".equals(function.getName())){
-						if("page".equals(((PropertyValue)function.getParameters().get(0)).getCssText())){
-							R pgNum = wrapR(pageNum(inlineBox.getText()));
+				if(isPageCounter(inlineBox)){
+					R pgNum = wrapR(page(inlineBox.getText()));
 
-							getListForRun().getContent().add(pgNum);
+					getListForRun().getContent().add(pgNum);
 
-							// Run level styling
-							RPr rPr =  Context.getWmlObjectFactory().createRPr();
-							pgNum.setRPr(rPr);
-							formatRPr(rPr, cssClass, cssMap);
-						}
-					}
+					// Run level styling
+					RPr rPr =  Context.getWmlObjectFactory().createRPr();
+					pgNum.setRPr(rPr);
+					formatRPr(rPr, cssClass, cssMap);
+				}
+				else if(isPagesCounter(inlineBox)){
+					R pgNum = wrapR(numPages(inlineBox.getText()));
+
+					getListForRun().getContent().add(pgNum);
+
+					// Run level styling
+					RPr rPr =  Context.getWmlObjectFactory().createRPr();
+					pgNum.setRPr(rPr);
+					formatRPr(rPr, cssClass, cssMap);
+
 				}
 				else {
 					addRun(cssClass, cssMap, inlineBox.getText());
@@ -1931,6 +1936,18 @@ public class XHTMLImporterImpl implements XHTMLImporter {
     	}            				
 	}
 
+	private boolean isPageCounter(InlineBox inlineBox) {
+		return isCounter(inlineBox) && "page".equals(((PropertyValue) inlineBox.getFunction().getParameters().get(0)).getCssText());
+	}
+
+	private boolean isPagesCounter(InlineBox inlineBox) {
+		return isCounter(inlineBox) && "pages".equals(((PropertyValue) inlineBox.getFunction().getParameters().get(0)).getCssText());
+	}
+
+	private boolean isCounter(InlineBox inlineBox) {
+		return inlineBox.getFunction() != null && "counter".equals(inlineBox.getFunction().getName());
+	}
+
 	private R wrapR(Object object){
 		R run2 = Context.getWmlObjectFactory().createR();
 		run2.getContent().add(object);
@@ -1938,11 +1955,19 @@ public class XHTMLImporterImpl implements XHTMLImporter {
 		return run2;
 	}
 
-	private JAXBElement<CTSimpleField> pageNum(String value) {
+	private JAXBElement<CTSimpleField> page(String value) {
+		return field("PAGE", value);
+	}
+
+	private JAXBElement<CTSimpleField> numPages(String value) {
+		return field("NUMPAGES", value);
+	}
+
+	private JAXBElement<CTSimpleField> field(String page, String value) {
 		ObjectFactory factory = Context.getWmlObjectFactory();
 
 		CTSimpleField ctSimple = factory.createCTSimpleField();
-		ctSimple.setInstr(" PAGE \\* MERGEFORMAT ");
+		ctSimple.setInstr(" " + page + " \\* MERGEFORMAT ");
 
 		RPr RPr = factory.createRPr();
 		RPr.setNoProof(new BooleanDefaultTrue());
