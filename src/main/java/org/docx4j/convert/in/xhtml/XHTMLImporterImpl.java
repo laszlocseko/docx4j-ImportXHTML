@@ -59,34 +59,26 @@ import org.docx4j.model.properties.PropertyFactory;
 import org.docx4j.model.properties.paragraph.AbstractParagraphProperty;
 import org.docx4j.model.properties.run.AbstractRunProperty;
 import org.docx4j.model.properties.run.FontSize;
-import org.docx4j.model.structure.SectionWrapper;
 import org.docx4j.openpackaging.exceptions.Docx4JException;
 import org.docx4j.openpackaging.exceptions.InvalidFormatException;
 import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
-import org.docx4j.openpackaging.parts.WordprocessingML.FooterPart;
-import org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart;
 import org.docx4j.openpackaging.parts.WordprocessingML.NumberingDefinitionsPart;
 import org.docx4j.openpackaging.parts.WordprocessingML.StyleDefinitionsPart;
 import org.docx4j.openpackaging.parts.relationships.Namespaces;
 import org.docx4j.openpackaging.parts.relationships.RelationshipsPart;
 import org.docx4j.org.xhtmlrenderer.css.constants.CSSName;
 import org.docx4j.org.xhtmlrenderer.css.constants.IdentValue;
-import org.docx4j.org.xhtmlrenderer.css.constants.MarginBoxName;
-import org.docx4j.org.xhtmlrenderer.css.constants.PageElementPosition;
 import org.docx4j.org.xhtmlrenderer.css.parser.FSFunction;
 import org.docx4j.org.xhtmlrenderer.css.parser.PropertyValue;
-import org.docx4j.org.xhtmlrenderer.css.sheet.PropertyDeclaration;
 import org.docx4j.org.xhtmlrenderer.css.style.CalculatedStyle;
 import org.docx4j.org.xhtmlrenderer.css.style.DerivedValue;
 import org.docx4j.org.xhtmlrenderer.css.style.FSDerivedValue;
 import org.docx4j.org.xhtmlrenderer.css.style.derived.LengthValue;
 import org.docx4j.org.xhtmlrenderer.docx.DocxRenderer;
-import org.docx4j.org.xhtmlrenderer.layout.Layer;
 import org.docx4j.org.xhtmlrenderer.layout.Styleable;
 import org.docx4j.org.xhtmlrenderer.newtable.TableBox;
 import org.docx4j.org.xhtmlrenderer.render.*;
 import org.docx4j.org.xhtmlrenderer.resource.XMLResource;
-import org.docx4j.relationships.Relationship;
 import org.docx4j.wml.*;
 import org.docx4j.wml.DocDefaults.RPrDefault;
 import org.docx4j.wml.P.Hyperlink;
@@ -98,9 +90,6 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.css.CSSValue;
 import org.xml.sax.InputSource;
-
-import static org.docx4j.org.xhtmlrenderer.css.parser.PropertyValue.VALUE_TYPE_FUNCTION;
-import static org.docx4j.wml.STPTabLeader.NONE;
 
 /**
  * Convert XHTML + CSS to WordML content.  Can convert an entire document, 
@@ -809,9 +798,11 @@ public class XHTMLImporterImpl implements XHTMLImporter {
     }
 
 	private void traverse(Box box,  Box parent, TableProperties tableProperties) throws Docx4JException {
-        
-    	boolean mustPop = false;
-    	
+
+		if(box.getStyle().isRunning()){
+			return;
+		}
+		boolean mustPop = false;
         log.debug(box.getClass().getName() );
         if (box instanceof BlockBox) {
         	        	

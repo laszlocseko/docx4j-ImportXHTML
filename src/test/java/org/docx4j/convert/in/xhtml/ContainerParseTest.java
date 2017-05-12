@@ -30,12 +30,18 @@ package org.docx4j.convert.in.xhtml;
 import org.docx4j.openpackaging.exceptions.Docx4JException;
 import org.docx4j.openpackaging.exceptions.InvalidFormatException;
 import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
+import org.docx4j.org.xhtmlrenderer.render.BlockBox;
+import org.docx4j.org.xhtmlrenderer.render.InlineBox;
 import org.docx4j.wml.*;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.util.List;
+
+import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 
 public class ContainerParseTest {
     private final String PNG_IMAGE_DATA = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACAgMAAAAP2OW3AAAADFBMVEUDAP//AAAA/wb//AAD4Tw1AAAACXBIWXMAAAsTAAALEwEAmpwYAAAADElEQVQI12NwYNgAAAF0APHJnpmVAAAAAElFTkSuQmCC";
@@ -102,4 +108,24 @@ public class ContainerParseTest {
             }
         }
 	}
+
+    @Test
+    public void div() throws Exception {
+        List<Object> convert = convert("<div>Content</div>");
+
+        assertThat(convert.size() , is(1));
+        P box = (P) convert.get(0);
+        assertThat(box.getContent().size(), is(1));
+        R r = (R) box.getContent().get(0);
+        Text text = (Text) r.getContent().get(0);
+        assertThat(text.getValue(), is("Content"));
+    }
+
+    @Test
+    public void runningelementIgnored() throws Exception {
+        List<Object> convert = convert("<div style='position:running(runningelement)'>Content</div>");
+
+        assertThat(convert.size() , is(0));
+    }
+
 }
