@@ -91,6 +91,8 @@ import org.w3c.dom.Node;
 import org.w3c.dom.css.CSSValue;
 import org.xml.sax.InputSource;
 
+import static org.docx4j.wml.STBrType.PAGE;
+
 /**
  * Convert XHTML + CSS to WordML content.  Can convert an entire document, 
  * or a fragment consisting of one or more block level objects.
@@ -854,7 +856,7 @@ public class XHTMLImporterImpl implements XHTMLImporter {
 	            */
             	// So do it this way ...
                 if (e.getNodeName().equals("div")) {
-                	
+
                 	if (divHandler!=null) {
                 		
                 		ContentAccessor ca = divHandler.enter(blockBox, this.contentContextStack.peek());
@@ -867,8 +869,8 @@ public class XHTMLImporterImpl implements XHTMLImporter {
 //                	attachmentPointP = this.getCurrentParagraph(true);
 //                	attachmentPointP.setPPr(this.getPPr(blockBox, cssMap));
                 	this.getCurrentParagraph(true).setPPr(this.getPPr(blockBox, cssMap));
-                	
-                	
+
+
                 } else if (box.getStyle().getDisplayMine().equals("inline") ) {
             		
 //                	// Don't add a paragraph for this, unless ..
@@ -1216,14 +1218,16 @@ public class XHTMLImporterImpl implements XHTMLImporter {
             	log.debug("Processing children of " + box.getElement().getNodeName() );
 	            switch (blockBox.getChildrenContentType()) {
 	                case BlockBox.CONTENT_BLOCK:
-	                	log.debug(".. which are BlockBox.CONTENT_BLOCK");	                	
-	                    for (Object o : ((BlockBox)box).getChildren() ) {
+	                	log.debug(".. which are BlockBox.CONTENT_BLOCK");
+	                    addPageBreakBefore(blockBox);
+						for (Object o : box.getChildren() ) {
 	                        log.debug("   processing child " + o.getClass().getName() );
 	                    	
 	                        traverse((Box)o,  box, tableProperties);                    
 	                        log.debug(".. processed child " + o.getClass().getName() );
 	                    }
-	                    break;
+						addPageBreakAfter(blockBox);
+						break;
 	                case BlockBox.CONTENT_INLINE:
 	                	
 	                	log.debug(".. which are BlockBox.CONTENT_INLINE");	                	
@@ -1334,8 +1338,32 @@ public class XHTMLImporterImpl implements XHTMLImporter {
         }
     
     }
-    
-    private static final String FIGCAPTION_SEQUENCE_ATTRIBUTE_NAME="sequence";
+
+	private void addPageBreakAfter(BlockBox box) {
+		Map<String, CSSValue> cssMap = getCascadedProperties(box.getStyle());
+
+		CSSValue pageBreakAfter = cssMap.get("page-break-after");
+		if("always".equals(pageBreakAfter.getCssText())){
+
+			Br br = Context.getWmlObjectFactory().createBr();
+			br.setType(PAGE);
+			getListForRun().getContent().add(br);
+		}
+	}
+
+	private void addPageBreakBefore(BlockBox box) {
+		Map<String, CSSValue> cssMap = getCascadedProperties(box.getStyle());
+
+		CSSValue pageBreakAfter = cssMap.get("page-break-before");
+		if("always".equals(pageBreakAfter.getCssText())){
+
+			Br br = Context.getWmlObjectFactory().createBr();
+			br.setType(PAGE);
+			getListForRun().getContent().add(br);
+		}
+	}
+
+	private static final String FIGCAPTION_SEQUENCE_ATTRIBUTE_NAME="sequence";
     private static final String FIGCAPTION_SEQUENCE_ATTRIBUTE_VALUE_DEFAULT="Figure"; 
     
     
@@ -1842,7 +1870,7 @@ public class XHTMLImporterImpl implements XHTMLImporter {
 			} else if (s.getElement().getNodeName() == null) {
         		log.debug("Null element nodename " ); 
 			} else if (s.getElement().getNodeName().equals("br") ) {
-                
+
                 R run = Context.getWmlObjectFactory().createR();
                 getListForRun().getContent().add(run);                
            		run.getContent().add(Context.getWmlObjectFactory().createBr());
