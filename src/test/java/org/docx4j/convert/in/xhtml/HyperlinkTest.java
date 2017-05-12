@@ -42,6 +42,8 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.util.List;
 
+import static org.docx4j.wml.STPTabAlignment.RIGHT;
+import static org.docx4j.wml.STPTabRelativeTo.MARGIN;
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsNot.not;
 import static org.junit.Assert.*;
@@ -167,7 +169,11 @@ public class HyperlinkTest {
 
 		P p = (P)converted.get(0);
 
-		CTSimpleField fldSimple = ((JAXBElement<CTSimpleField>) ((R)p.getContent().get(0)).getContent().get(0)).getValue();
+		R.Ptab tab = (R.Ptab) ((R)p.getContent().get(0)).getContent().get(0);
+		assertThat(tab.getAlignment(), is(RIGHT));
+		assertThat(tab.getRelativeTo(), is(MARGIN));
+
+		CTSimpleField fldSimple = ((JAXBElement<CTSimpleField>) ((R)p.getContent().get(1)).getContent().get(0)).getValue();
 		assertThat(fldSimple.getInstr(), is(" PAGEREF " + anchor + " \\* MERGEFORMAT "));
 
 		Text pageNumberText = (Text) ((R)fldSimple.getContent().get(0)).getContent().get(1);

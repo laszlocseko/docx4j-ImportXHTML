@@ -92,6 +92,8 @@ import org.w3c.dom.css.CSSValue;
 import org.xml.sax.InputSource;
 
 import static org.docx4j.wml.STBrType.PAGE;
+import static org.docx4j.wml.STPTabLeader.DOT;
+import static org.docx4j.wml.STPTabLeader.NONE;
 
 /**
  * Convert XHTML + CSS to WordML content.  Can convert an entire document, 
@@ -1672,7 +1674,16 @@ public class XHTMLImporterImpl implements XHTMLImporter {
     		}
 			
 			if(isAfter(inlineBox)){
-				if(isTargetCounter(inlineBox)){
+				if(isLeader(inlineBox)){
+					R rightTabR = Context.getWmlObjectFactory().createR();
+					R.Ptab rightTab = Context.getWmlObjectFactory().createRPtab();
+					rightTab.setLeader(DOT);
+					rightTab.setAlignment(STPTabAlignment.RIGHT);
+					rightTab.setRelativeTo(STPTabRelativeTo.MARGIN);
+					rightTabR.getContent().add(rightTab);
+					getListForRun().getContent().add(rightTabR);
+				}
+				else if(isTargetCounter(inlineBox)){
 					FSFunction targetCounterFunction = inlineBox.getFunction();
 					PropertyValue url = (PropertyValue) targetCounterFunction.getParameters().get(0);
 					if(isFunction(url)){
@@ -1871,6 +1882,10 @@ public class XHTMLImporterImpl implements XHTMLImporter {
         processInlineBoxContent(inlineBox, s, cssMap);
 
     }
+
+	private boolean isLeader(InlineBox inlineBox) {
+		return isFunction(inlineBox) && "leader".equals(inlineBox.getFunction().getName());
+	}
 
 	private JAXBElement<CTSimpleField> pageRef(InlineBox inlineBox, String href) {
 		return field("PAGEREF " + href.substring(1), inlineBox.getText());
