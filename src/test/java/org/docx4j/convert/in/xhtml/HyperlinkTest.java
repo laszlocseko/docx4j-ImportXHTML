@@ -37,13 +37,13 @@ import org.docx4j.wml.*;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.OutputStreamWriter;
+import javax.xml.bind.JAXBElement;
 import java.io.StringWriter;
 import java.io.Writer;
-import java.math.BigInteger;
-import java.util.HashMap;
 import java.util.List;
 
+import static org.hamcrest.core.Is.is;
+import static org.hamcrest.core.IsNot.not;
 import static org.junit.Assert.*;
 
 public class HyperlinkTest {
@@ -149,6 +149,29 @@ public class HyperlinkTest {
 		// Test just bookmark start + end + span
 		assertTrue(p.getContent().size()==3);
 		assertEquals(XmlUtils.unwrap(p.getContent().get(1)).getClass(), CTMarkupRange.class);
+	}
+
+	@Test public void testNamedAnchorTargetCounter() throws Docx4JException {
+		String anchor = "anchor";
+
+		String pgNumContent = "content: leader(dotted) target-counter(attr(href), page, decimal)";
+		String pgNumClass = "pageNum";
+		String a = "<a href='#" + anchor + "' class='" + pgNumClass + "'></a>";
+
+		String html = "<html><head><style>" +
+				"."+pgNumClass+":after{"
+				+pgNumContent+";}" +
+				"</style></head><body>"+ a + "</body></html>";
+		List<Object> converted = convert(html);
+		System.out.println(XmlUtils.marshaltoString(converted.get(0), true, true));
+
+		P p = (P)converted.get(0);
+
+		CTSimpleField fldSimple = ((JAXBElement<CTSimpleField>) ((R)p.getContent().get(0)).getContent().get(0)).getValue();
+		assertThat(fldSimple.getInstr(), is(" PAGEREF " + anchor + " \\* MERGEFORMAT "));
+
+		Text pageNumberText = (Text) ((R)fldSimple.getContent().get(0)).getContent().get(1);
+		assertThat(pageNumberText.getValue(), not(""));
 	}
 
 	@Test public void testNamedAnchorContent() throws Docx4JException {

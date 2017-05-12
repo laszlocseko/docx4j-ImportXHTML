@@ -68,6 +68,7 @@ import org.docx4j.openpackaging.parts.relationships.Namespaces;
 import org.docx4j.openpackaging.parts.relationships.RelationshipsPart;
 import org.docx4j.org.xhtmlrenderer.css.constants.CSSName;
 import org.docx4j.org.xhtmlrenderer.css.constants.IdentValue;
+import org.docx4j.org.xhtmlrenderer.css.parser.FSFunction;
 import org.docx4j.org.xhtmlrenderer.css.parser.PropertyValue;
 import org.docx4j.org.xhtmlrenderer.css.style.CalculatedStyle;
 import org.docx4j.org.xhtmlrenderer.css.style.DerivedValue;
@@ -1669,8 +1670,31 @@ public class XHTMLImporterImpl implements XHTMLImporter {
     		if (href!=null && !href.trim().equals("")) {
     			log.warn("Ignoring @href on <a> without content.");
     		}
+			
+			if(isAfter(inlineBox)){
+				if(isTargetCounter(inlineBox)){
+					FSFunction targetCounterFunction = inlineBox.getFunction();
+					PropertyValue url = (PropertyValue) targetCounterFunction.getParameters().get(0);
+					if(isFunction(url)){
+						FSFunction urlFunction = url.getFunction();
+						if("attr".equals(urlFunction.getName())){
+							PropertyValue name = (PropertyValue) urlFunction.getParameters().get(0);
+							if("href".equals(name.getCssText())){
+
+								R pageRef = wrapR(pageRef(inlineBox, href));
+
+								getListForRun().getContent().add(pageRef);
+
+								// Run level styling
+								RPr rPr =  Context.getWmlObjectFactory().createRPr();
+								pageRef.setRPr(rPr);
+								formatRPr(rPr, getCssClass(s), getCascadedProperties(s.getStyle()));
+							}
+						}
+					}
+				}
+			}
     		return;
-    		
     	} 
         
         Map<String, CSSValue> cssMap = getCascadedProperties(s.getStyle());
@@ -1693,11 +1717,8 @@ public class XHTMLImporterImpl implements XHTMLImporter {
         	// Do nothing
         } else {
             debug = "<" + s.getElement().getNodeName();
-            
-            String cssClass = getClassAttribute(s.getElement());
-        	if (cssClass!=null) {
-        	 	cssClass=cssClass.trim();
-        	}
+
+			String cssClass = getCssClass(s);
         	
             
             if (s.getElement().getNodeName().equals("a")) {
@@ -1735,65 +1756,65 @@ public class XHTMLImporterImpl implements XHTMLImporter {
             		
             		if (href!=null
             				&& !href.trim().equals("")) {
-            			
+
 	                	Hyperlink h = null;
 	                	String linkText = inlineBox.getElement().getTextContent();
-	                	//log.debug("getTextContent:" + linkText);  
-	                	
+	                	//log.debug("getTextContent:" + linkText);
+
 	                    RPr rPr =  Context.getWmlObjectFactory().createRPr();
 	                    formatRPr(rPr, cssClass, cssMap);
-	                    
+
 	                	log.debug(XmlUtils.marshaltoString(rPr));
-	                	
-	                	// ensure we've got our current p set correctly; this is done above already 
+
+	                	// ensure we've got our current p set correctly; this is done above already
                 		// this.getCurrentParagraph(true);
-	                	
+
 	                	if (linkText!=null
 	                			&& !linkText.trim().equals("")) {
-	                		
+
 	                    	// For example, consider <a href=\"#requirement897\">[R_897] <b>Requirement</b> 3</a>
-	                    	// Here we are processing the text "[R_897] " (ie the leading text)	                		
+	                    	// Here we are processing the text "[R_897] " (ie the leading text)
 		                	log.debug("getText:" + inlineBox.getText());
-	                		
+
 	                    	h = createHyperlink(
-	                    			href, 
+	                    			href,
 	                    			rPr,
-	                    			inlineBox.getText(), rp);                                    	            		
+	                    			inlineBox.getText(), rp);
 	                    	this.getCurrentParagraph(false).getContent().add(h);
-	                    	
+
 	                    	// bookmark end
 	                    	if (markuprange!=null) {
 	                    		bookmarkHelper.attachBookmarkEnd(markuprange, getCurrentParagraph(false), this.contentContextStack.peek());
-	                    		markuprange = null;        			                    		
-	                    	}            				
-	                    	
-	                        		                	
+	                    		markuprange = null;
+	                    	}
+
+
 		                	if (inlineBox.isEndsHere()) {
 		                    	log.debug("Processing ..</a> (ends here as well) ");
 		                    	return; // don't change contentContext
-		                		
+
 		                	} else {
 		                    	log.debug("now attaching inside hyperlink ");
 		                		attachmentPointH = h;
-		                		return; 
+		                		return;
 		                	}
-		                	
-	                	} 
+
+	                	}
 	                	else {
 	                    	// No text content.  An image or something?  TODO handle hyperlink around inline image
 	                		log.warn("Expected hyperlink content, since tag not self-closing");
 	                    	h = createHyperlink(
-	                    			href, 
+	                    			href,
 	                    			rPr,
-	                    			href, rp);                                    	            		
+	                    			href, rp);
 	                    	this.getCurrentParagraph(false).getContent().add(h);
-		                	
+
 		                	// bookmark end
 		                	if (markuprange!=null) {
 		                		bookmarkHelper.attachBookmarkEnd(markuprange, getCurrentParagraph(false), this.contentContextStack.peek());
-	                    		markuprange = null;        				                		
-		                	}            				
-		                	
+	                    		markuprange = null;
+		                	}
+
 		                	return;
 	                	}
             		}
@@ -1851,6 +1872,43 @@ public class XHTMLImporterImpl implements XHTMLImporter {
 
     }
 
+	private JAXBElement<CTSimpleField> pageRef(InlineBox inlineBox, String href) {
+		return field("PAGEREF " + href.substring(1), inlineBox.getText());
+	}
+
+	private boolean isTargetCounter(InlineBox inlineBox) {
+		if(!isFunction(inlineBox)){
+			return false;
+		}
+		FSFunction function = inlineBox.getFunction();
+		if(!"target-counter".equals(function.getName())){
+			return false;
+		}
+		return true;
+	}
+
+	private boolean isFunction(Object o) {
+		if(o instanceof InlineBox){
+			return ((InlineBox)o).getFunction() != null;
+		}
+		else if(o instanceof PropertyValue){
+			return ((PropertyValue)o).getFunction() != null;
+		}
+		return false;
+	}
+
+	private boolean isAfter(InlineBox inlineBox) {
+		return "after".equals(inlineBox.getPseudoElementOrClass());
+	}
+
+	private String getCssClass(Styleable s) {
+		String cssClass = getClassAttribute(s.getElement());
+		if (cssClass!=null) {
+             cssClass=cssClass.trim();
+        }
+		return cssClass;
+	}
+
 	private void processInlineBoxContent(InlineBox inlineBox, Styleable s,
 			Map<String, CSSValue> cssMap) {
 				
@@ -1874,10 +1932,7 @@ public class XHTMLImporterImpl implements XHTMLImporter {
                 getListForRun().getContent().add(run);                
            		run.getContent().add(Context.getWmlObjectFactory().createBr());
 			} else if("after".equals(inlineBox.getPseudoElementOrClass())){
-				String cssClass = getClassAttribute(s.getElement());
-				if (cssClass != null) {
-					cssClass = cssClass.trim();
-				}
+				String cssClass = getCssClass(s);
 				if(isPageCounter(inlineBox)){
 					R pgNum = wrapR(page(inlineBox.getText()));
 
@@ -1915,11 +1970,8 @@ public class XHTMLImporterImpl implements XHTMLImporter {
 
             String theText = inlineBox.getTextNode().getTextContent(); 
             log.debug("Processing " + theText);
-            
-            String cssClass = getClassAttribute(s.getElement());
-        	if (cssClass!=null) {
-        	 	cssClass=cssClass.trim();
-        	}
+
+			String cssClass = getCssClass(s);
             addRun(cssClass, cssMap, theText);
     	            
 //                                    else {
@@ -1945,7 +1997,7 @@ public class XHTMLImporterImpl implements XHTMLImporter {
 	}
 
 	private boolean isCounter(InlineBox inlineBox) {
-		return inlineBox.getFunction() != null && "counter".equals(inlineBox.getFunction().getName());
+		return isFunction(inlineBox) && "counter".equals(inlineBox.getFunction().getName());
 	}
 
 	private R wrapR(Object object){
@@ -1963,11 +2015,11 @@ public class XHTMLImporterImpl implements XHTMLImporter {
 		return field("NUMPAGES", value);
 	}
 
-	private JAXBElement<CTSimpleField> field(String page, String value) {
+	private JAXBElement<CTSimpleField> field(String fieldName, String value) {
 		ObjectFactory factory = Context.getWmlObjectFactory();
 
 		CTSimpleField ctSimple = factory.createCTSimpleField();
-		ctSimple.setInstr(" " + page + " \\* MERGEFORMAT ");
+		ctSimple.setInstr(" " + fieldName + " \\* MERGEFORMAT ");
 
 		RPr RPr = factory.createRPr();
 		RPr.setNoProof(new BooleanDefaultTrue());

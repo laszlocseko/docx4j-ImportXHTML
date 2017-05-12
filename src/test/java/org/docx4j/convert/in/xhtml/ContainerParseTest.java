@@ -37,9 +37,11 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import javax.xml.bind.JAXBElement;
 import java.util.List;
 
 import static org.hamcrest.core.Is.is;
+import static org.hamcrest.core.IsNot.not;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
@@ -119,6 +121,22 @@ public class ContainerParseTest {
         R r = (R) box.getContent().get(0);
         Text text = (Text) r.getContent().get(0);
         assertThat(text.getValue(), is("Content"));
+    }
+
+    @Test
+    public void divPageInserted() throws Exception {
+        String style = ".pageNo:after{" +
+                "content: counter(page);" +
+                "}";
+        List<Object> converted = convert("<html><head><style>"+style+"</style></head><body><div class='pageNo'></div></body></html>");
+
+        P p = (P)converted.get(0);
+
+        CTSimpleField fldSimple = ((JAXBElement<CTSimpleField>) ((R)p.getContent().get(0)).getContent().get(0)).getValue();
+        assertThat(fldSimple.getInstr(), is(" PAGE \\* MERGEFORMAT "));
+
+        Text pageNumberText = (Text) ((R)fldSimple.getContent().get(0)).getContent().get(1);
+        assertThat(pageNumberText.getValue(), is("999"));
     }
 
     @Test
