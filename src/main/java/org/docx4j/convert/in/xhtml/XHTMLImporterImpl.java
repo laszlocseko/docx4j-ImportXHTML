@@ -1855,6 +1855,29 @@ public class XHTMLImporterImpl implements XHTMLImporter {
                 R run = Context.getWmlObjectFactory().createR();
                 getListForRun().getContent().add(run);                
            		run.getContent().add(Context.getWmlObjectFactory().createBr());
+			} else if("after".equals(inlineBox.getPseudoElementOrClass())){
+				String cssClass = getClassAttribute(s.getElement());
+				if (cssClass != null) {
+					cssClass = cssClass.trim();
+				}
+				if(inlineBox.getFunction() != null){
+					FSFunction function = inlineBox.getFunction();
+					if("counter".equals(function.getName())){
+						if("page".equals(((PropertyValue)function.getParameters().get(0)).getCssText())){
+							R pgNum = wrapR(pageNum(inlineBox.getText()));
+
+							getListForRun().getContent().add(pgNum);
+
+							// Run level styling
+							RPr rPr =  Context.getWmlObjectFactory().createRPr();
+							pgNum.setRPr(rPr);
+							formatRPr(rPr, cssClass, cssMap);
+						}
+					}
+				}
+				else {
+					addRun(cssClass, cssMap, inlineBox.getText());
+				}
 			}
 			else{
             	log.debug("InlineBox has no TextNode, so skipping" );
@@ -1863,7 +1886,6 @@ public class XHTMLImporterImpl implements XHTMLImporter {
             	// need to traverse, how?
             	
             }
-            
         } else  {
             log.debug( inlineBox.getTextNode().getTextContent() );  // don't use .getText()
 
@@ -1888,6 +1910,34 @@ public class XHTMLImporterImpl implements XHTMLImporter {
     	if (markupRangeForID!=null) {
     		bookmarkHelper.attachBookmarkEnd(markupRangeForID, getCurrentParagraph(false), this.contentContextStack.peek());
     	}            				
+	}
+
+	private R wrapR(Object object){
+		R run2 = Context.getWmlObjectFactory().createR();
+		run2.getContent().add(object);
+
+		return run2;
+	}
+
+	private JAXBElement<CTSimpleField> pageNum(String value) {
+		ObjectFactory factory = Context.getWmlObjectFactory();
+
+		CTSimpleField ctSimple = factory.createCTSimpleField();
+		ctSimple.setInstr(" PAGE \\* MERGEFORMAT ");
+
+		RPr RPr = factory.createRPr();
+		RPr.setNoProof(new BooleanDefaultTrue());
+
+		Text t = factory.createText();
+		t.setValue(value);
+
+		R run = factory.createR();
+		run.getContent().add(RPr);
+		run.getContent().add(t);
+
+		ctSimple.getContent().add(run);
+
+		return factory.createPFldSimple(ctSimple);
 	}
 
 	private String getClassAttribute(Element e) {
