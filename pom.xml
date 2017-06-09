@@ -101,8 +101,8 @@
 						mirrors this in Eclipse's compiler settings, and Eclipse then complains about
 						the @Override annotations :-( So you must manually change the Eclipse compiler
 						setting back to 1.6. -->
-					<source>1.5</source>
-					<target>1.5</target>
+					<source>1.6</source>
+					<target>1.6</target>
 
 					<verbose>false</verbose>
 					<!-- maxmemory>512m</maxmemory On Linux, use: MAVEN_OPTS="-Xmx512m" mvn install -->
